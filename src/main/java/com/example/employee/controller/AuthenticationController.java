@@ -3,6 +3,7 @@ package com.example.employee.controller;
 import com.example.employee.model.User;
 import com.example.employee.repository.UserRepository;
 import com.example.employee.util.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -11,11 +12,15 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthenticationController {
+
+    private Set<String> blacklist = new HashSet<>();
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
@@ -41,13 +46,8 @@ public class AuthenticationController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody User user) {
         User existingUser = userRepository.findByUsername(user.getUsername());
-        if (existingUser == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
-        }
-
-        boolean passwordMatches = bCryptPasswordEncoder.matches(user.getPassword(), existingUser.getPassword());
-        if (!passwordMatches) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
+        if (existingUser == null || !bCryptPasswordEncoder.matches(user.getPassword(), existingUser.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid username or password"));
         }
 
         String token = JwtUtil.createToken(existingUser.getUsername());
@@ -61,11 +61,21 @@ public class AuthenticationController {
 
     @PostMapping("/logout")
     public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
-        // Invalidating session and, optionally, add the token to blacklist
-        // ...
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        // Add the token to a blacklist
+        blacklist.add(token);
+
+        // Optionally, you can remove the token from the blacklist after a certain period of time
 
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok("Logout successful");
     }
 
+    public boolean isTokenBlacklisted(String token) {
+        return blacklist.contains(token);
+    }
 }

@@ -3,6 +3,7 @@ package com.example.employee.config;
 import com.example.employee.service.UserDetailsServiceImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,20 +25,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http.csrf().disable();
-        http.authorizeRequests()
-                .antMatchers("/auth/login", "/auth/register").permitAll()
-                .anyRequest().authenticated();
-        // add filters (for login and registration)
-    }
-
-    @Bean
-    public AuthenticationManager customAuthenticationManager() throws Exception {
-        return authenticationManager();
+        http.csrf().disable()
+                .authorizeRequests()
+                .antMatchers("/auth/register", "/auth/login").permitAll()
+                .antMatchers(HttpMethod.POST, "/employees/addemployee").permitAll()
+                .antMatchers(HttpMethod.PUT, "/employees/employee/**").permitAll()
+                .antMatchers(HttpMethod.DELETE, "/employees/employee/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/employees/allemployee").authenticated()
+                .antMatchers("/employees/**").authenticated()
+                .anyRequest().authenticated()
+                .and()
+                .logout().logoutUrl("/auth/logout").permitAll();
     }
 
     @Override
-    public void configure(AuthenticationManagerBuilder auth) throws Exception {
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
         auth.userDetailsService(userDetailsService).passwordEncoder(bCryptPasswordEncoder);
+    }
+
+    @Override
+    @Bean
+    public AuthenticationManager authenticationManagerBean() throws Exception {
+        return super.authenticationManagerBean();
     }
 }
